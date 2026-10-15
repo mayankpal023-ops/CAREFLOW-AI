@@ -1,0 +1,68 @@
+"""
+CareFlow AI - Shared Plotly Chart Configuration
+Ensures consistent light theme across all charts.
+"""
+import plotly.graph_objects as go
+
+# Color palette
+COLORS = {
+    'primary': '#2563EB',
+    'teal': '#0F766E',
+    'purple': '#7C3AED',
+    'amber': '#D97706',
+    'green': '#059669',
+    'red': '#DC2626',
+    'blue_light': '#3B82F6',
+    'gray': '#6B7280',
+}
+
+STATUS_COLORS = {
+    'Submitted': '#D97706',
+    'Pending': '#3B82F6',
+    'Processing': '#7C3AED',
+    'Completed': '#059669',
+    'Cancelled': '#DC2626',
+}
+
+def get_light_layout(title=None, height=350, showlegend=True):
+    """Get a consistent light layout for all charts."""
+    layout = go.Layout(
+        title=dict(
+            text=title,
+            font=dict(size=16, color='#172B4D', family='Inter, sans-serif'),
+            x=0.05
+        ),
+        plot_bgcolor='#FFFFFF',
+        paper_bgcolor='#FFFFFF',
+        font=dict(
+            family='Inter, sans-serif',
+            color='#172B4D',
+            size=12
+        ),
+        margin=dict(l=50, r=30, t=60, b=50),
+        showlegend=showlegend,
+        legend=dict(
+            font=dict(size=11, color='#172B4D'),
+            bgcolor='rgba(255,255,255,0.8)',
+            bordercolor='#E2E8F0',
+            borderwidth=1
+        ),
+        xaxis=dict(
+            gridcolor='#F1F5F9',
+            linecolor='#E2E8F0',
+            tickfont=dict(size=11, color='#526581'),
+            title_font=dict(size=13, color='#172B4D')
+        ),
+        yaxis=dict(
+            gridcolor='#F1F5F9',
+            linecolor='#E2E8F0',
+            tickfont=dict(size=11, color='#526581'),
+            title_font=dict(size=13, color='#172B4D')
+        ),
+        height=height,
+    )
+    return layout
+
+def get_pie_colors(statuses):
+    """Get consistent pie chart colors."""
+    return [STATUS_COLORS.get(s, '#6B7280') for s in statuses]

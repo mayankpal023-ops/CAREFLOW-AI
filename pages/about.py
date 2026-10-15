@@ -3,13 +3,13 @@ import streamlit as st
 
 def render_about():
     """Render the about and responsible AI page."""
-    st.markdown('<p class="section-title">About & Responsible AI</p>', unsafe_allow_html=True)
+    st.header("About & Responsible AI")
     
     tab1, tab2, tab3 = st.tabs(["About CareFlow AI", "Responsible AI", "Technical Details"])
     
     # Tab 1: About
     with tab1:
-        st.markdown("""
+        st.write("""
         ## CareFlow AI
         
         **Tagline:** Better Access. Smarter Clinics. Faster Workflows.
@@ -51,7 +51,7 @@ def render_about():
     
     # Tab 2: Responsible AI
     with tab2:
-        st.markdown("""
+        st.write("""
         ## Responsible AI Commitments
         
         ### Fairness & Equity
@@ -99,7 +99,7 @@ def render_about():
     
     # Tab 3: Technical Details
     with tab3:
-        st.markdown("""
+        st.write("""
         ## Technical Architecture
         
         ### Technology Stack
@@ -134,11 +134,13 @@ def render_about():
         ### Data Flow
         
         ```
-        Patient Portal → SQLite Database → Streamlit UI
-                              ↓
-                    Analytics Engine
-                              ↓
-                    Operational Insights
+        Patient Portal -> SQLite Database -> Streamlit UI
+                              |
+                              v
+                        Analytics Engine
+                              |
+                              v
+                       Operational Insights
         ```
         
         ### Scalability Considerations

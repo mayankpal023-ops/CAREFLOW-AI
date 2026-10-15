@@ -11,6 +11,9 @@ import uuid
 
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'data', 'careflow.db')
 
+# Ensure data directory exists
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+
 def get_db_connection():
     """Get a database connection with row factory."""
     conn = sqlite3.connect(DB_PATH)
@@ -42,9 +45,11 @@ def init_database():
                 patient_name TEXT NOT NULL,
                 patient_email TEXT,
                 patient_phone TEXT,
+                preferred_contact_method TEXT DEFAULT 'email',
                 category TEXT NOT NULL,
                 urgency TEXT NOT NULL,
                 description TEXT NOT NULL,
+                preferred_appointment_date TEXT,
                 status TEXT NOT NULL DEFAULT 'submitted',
                 assigned_staff TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -117,17 +122,20 @@ def create_patient_request(data: Dict[str, Any]) -> str:
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO patient_requests (
-                id, patient_name, patient_email, patient_phone, category,
-                urgency, description, status, language, accessibility_needs
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                id, patient_name, patient_email, patient_phone, preferred_contact_method,
+                category, urgency, description, preferred_appointment_date,
+                status, language, accessibility_needs
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             request_id,
             data.get('patient_name'),
             data.get('patient_email'),
             data.get('patient_phone'),
+            data.get('preferred_contact_method', 'email'),
             data.get('category'),
             data.get('urgency'),
             data.get('description'),
+            data.get('preferred_appointment_date', ''),
             'submitted',
             data.get('language', 'en'),
             data.get('accessibility_needs', '')
@@ -313,20 +321,31 @@ def get_dashboard_metrics() -> Dict[str, Any]:
         ''')
         recent = [dict(row) for row in cursor.fetchall()]
         
-        # Pending count
+        # Status counts
         pending = by_status.get('pending', 0) + by_status.get('submitted', 0)
         processing = by_status.get('processing', 0)
+        waiting_for_info = by_status.get('waiting_for_info', 0)
         completed = by_status.get('completed', 0)
+        
+        # Old unresolved (pending for more than 24 hours)
+        cursor.execute('''
+            SELECT COUNT(*) as count FROM patient_requests
+            WHERE status IN ('submitted', 'pending', 'waiting_for_info')
+            AND created_at < DATETIME('now', '-1 day')
+        ''')
+        old_unresolved = cursor.fetchone()['count']
         
         return {
             'total_requests': total,
             'pending_requests': pending,
             'processing_requests': processing,
+            'waiting_for_info': waiting_for_info,
             'completed_requests': completed,
             'avg_processing_time': avg_processing_time,
             'by_status': by_status,
             'by_category': by_category,
-            'recent_requests': recent
+            'recent_requests': recent,
+            'old_unresolved': old_unresolved
         }
 
 def get_category_trends(days: int = 30) -> List[Dict]:
@@ -380,9 +399,11 @@ DEMO_PATIENTS = [
         'patient_name': 'Maria Santos',
         'patient_email': 'maria.santos@email.com',
         'patient_phone': '(555) 123-4567',
-        'category': 'Appointment Scheduling',
+        'preferred_contact_method': 'email',
+        'category': 'Appointment booking',
         'urgency': 'Routine',
         'description': 'Need to schedule annual wellness checkup. Prefer morning appointments.',
+        'preferred_appointment_date': '2026-11-15',
         'language': 'es',
         'accessibility_needs': 'Spanish language support required'
     },
@@ -390,9 +411,11 @@ DEMO_PATIENTS = [
         'patient_name': 'James Chen',
         'patient_email': 'j.chen@email.com',
         'patient_phone': '(555) 234-5678',
-        'category': 'Prescription Refill',
+        'preferred_contact_method': 'phone',
+        'category': 'Medical report collection',
         'urgency': 'Urgent',
-        'description': 'Blood pressure medication running out in 2 days. Need refill authorization.',
+        'description': 'Need copies of recent lab results sent to specialist office before Friday.',
+        'preferred_appointment_date': '2026-10-20',
         'language': 'en',
         'accessibility_needs': ''
     },
@@ -400,9 +423,11 @@ DEMO_PATIENTS = [
         'patient_name': 'Aisha Johnson',
         'patient_email': 'aisha.j@email.com',
         'patient_phone': '(555) 345-6789',
-        'category': 'Insurance & Billing',
+        'preferred_contact_method': 'email',
+        'category': 'Billing and insurance assistance',
         'urgency': 'Routine',
-        'description': 'Question about coverage for recent lab work. Received unexpected bill.',
+        'description': 'Question about coverage for recent lab work. Received unexpected bill and need help understanding charges.',
+        'preferred_appointment_date': '',
         'language': 'en',
         'accessibility_needs': 'Screen reader compatible communications'
     },
@@ -410,9 +435,11 @@ DEMO_PATIENTS = [
         'patient_name': 'Robert Kim',
         'patient_email': 'r.kim@email.com',
         'patient_phone': '(555) 456-7890',
-        'category': 'Medical Records',
+        'preferred_contact_method': 'phone',
+        'category': 'Appointment rescheduling',
         'urgency': 'Soon',
-        'description': 'Need copies of immunization records for new employer. Urgent deadline.',
+        'description': 'Need to reschedule appointment from Oct 25 to Nov 2 due to work conflict.',
+        'preferred_appointment_date': '2026-11-02',
         'language': 'en',
         'accessibility_needs': ''
     },
@@ -420,9 +447,11 @@ DEMO_PATIENTS = [
         'patient_name': 'Fatima Al-Rashid',
         'patient_email': 'fatima.rashid@email.com',
         'patient_phone': '(555) 567-8901',
-        'category': 'Referral Request',
+        'preferred_contact_method': 'email',
+        'category': 'Registration assistance',
         'urgency': 'Soon',
-        'description': 'Primary care doctor recommended dermatology referral for skin condition.',
+        'description': 'New patient, need help completing registration forms. Prefer Arabic-speaking staff.',
+        'preferred_appointment_date': '2026-10-22',
         'language': 'ar',
         'accessibility_needs': 'Arabic language support, large print materials'
     },
@@ -430,9 +459,11 @@ DEMO_PATIENTS = [
         'patient_name': 'David Thompson',
         'patient_email': 'd.thompson@email.com',
         'patient_phone': '(555) 678-9012',
-        'category': 'Appointment Scheduling',
+        'preferred_contact_method': 'phone',
+        'category': 'Accessibility assistance',
         'urgency': 'Urgent',
-        'description': 'Severe tooth pain for 3 days. Need emergency dental referral.',
+        'description': 'Wheelchair user, need to confirm ground-floor appointment room and accessible parking.',
+        'preferred_appointment_date': '2026-10-18',
         'language': 'en',
         'accessibility_needs': 'Wheelchair accessible facility required'
     },
@@ -440,9 +471,11 @@ DEMO_PATIENTS = [
         'patient_name': 'Elena Rodriguez',
         'patient_email': 'elena.r@email.com',
         'patient_phone': '(555) 789-0123',
-        'category': 'Test Results',
+        'preferred_contact_method': 'email',
+        'category': 'General clinic enquiry',
         'urgency': 'Routine',
-        'description': 'Follow up on blood work from last week. Want to discuss results with doctor.',
+        'description': 'Follow up on blood work from last week. Want to understand what the results mean and next steps.',
+        'preferred_appointment_date': '',
         'language': 'es',
         'accessibility_needs': 'Spanish language support required'
     },
@@ -450,9 +483,11 @@ DEMO_PATIENTS = [
         'patient_name': 'Michael Okafor',
         'patient_email': 'm.okafor@email.com',
         'patient_phone': '(555) 890-1234',
-        'category': 'Prescription Refill',
+        'preferred_contact_method': 'phone',
+        'category': 'Billing and insurance assistance',
         'urgency': 'Soon',
-        'description': 'Diabetes medication refill needed. Also need glucose meter supplies.',
+        'description': 'Need to update insurance information and confirm coverage for upcoming procedure.',
+        'preferred_appointment_date': '',
         'language': 'en',
         'accessibility_needs': 'Visual impairment - needs audio instructions'
     }
@@ -512,13 +547,44 @@ def load_demo_data() -> Dict[str, int]:
     return {'requests': requests_created, 'staff': staff_created, 'message': f'Loaded {requests_created} demo requests and {staff_created} staff members'}
 
 def clear_demo_data():
-    """Clear demo data flag to allow reloading."""
+    """Clear only demo records, preserving real user requests."""
     with db_transaction() as conn:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM app_state WHERE key = 'demo_loaded'")
-        cursor.execute('DELETE FROM patient_requests')
-        cursor.execute('DELETE FROM request_history')
-        cursor.execute('DELETE FROM staff')
+        # Only delete staff created during demo load
+        cursor.execute("DELETE FROM staff WHERE email LIKE '%@clinic.com'")
+        # Delete demo requests (those created by the demo system)
+        cursor.execute('''
+            DELETE FROM patient_requests 
+            WHERE id IN (
+                SELECT DISTINCT pr.id FROM patient_requests pr
+                JOIN request_history rh ON rh.request_id = pr.id
+                WHERE rh.changed_by = 'System' AND rh.notes LIKE 'Demo:%'
+            )
+        ''')
+        # Clean up orphaned history
+        cursor.execute('''
+            DELETE FROM request_history 
+            WHERE request_id NOT IN (SELECT id FROM patient_requests)
+        ''')
+
+def migrate_database():
+    """Add new columns to existing database if they don't exist."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Check if preferred_contact_method column exists
+        cursor.execute("PRAGMA table_info(patient_requests)")
+        columns = [row['name'] for row in cursor.fetchall()]
+        
+        if 'preferred_contact_method' not in columns:
+            cursor.execute("ALTER TABLE patient_requests ADD COLUMN preferred_contact_method TEXT DEFAULT 'email'")
+        
+        if 'preferred_appointment_date' not in columns:
+            cursor.execute("ALTER TABLE patient_requests ADD COLUMN preferred_appointment_date TEXT")
+        
+        conn.commit()
 
 # Initialize on import
 init_database()
+migrate_database()

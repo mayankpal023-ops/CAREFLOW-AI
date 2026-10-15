@@ -1,23 +1,33 @@
 """Patient Requests Page"""
 import streamlit as st
 import pandas as pd
-from utils.database import get_all_patient_requests, get_patient_request, get_request_history
+from utils.database import get_all_patient_requests, get_request_history
 
-STATUS_OPTIONS = ["All", "submitted", "pending", "processing", "completed", "cancelled"]
+STATUS_OPTIONS = ["All", "submitted", "pending", "waiting_for_info", "processing", "completed", "cancelled"]
+
+STATUS_LABELS = {
+    'submitted': 'Submitted',
+    'pending': 'Pending',
+    'waiting_for_info': 'Waiting for Info',
+    'processing': 'Processing',
+    'completed': 'Completed',
+    'cancelled': 'Cancelled'
+}
 
 def render_patient_requests():
     """Render the patient requests view."""
-    st.markdown('<p class="section-title">Patient Requests</p>', unsafe_allow_html=True)
+    st.header("Patient Requests")
     
     # Filters
     col1, col2, col3 = st.columns([2, 2, 1])
     with col1:
-        status_filter = st.selectbox("Filter by Status", STATUS_OPTIONS)
+        status_filter = st.selectbox("Filter by Status", STATUS_OPTIONS, 
+                                    format_func=lambda x: STATUS_LABELS.get(x, x.replace('_', ' ').title()) if x != "All" else "All")
     with col2:
         search = st.text_input("Search by Patient Name", placeholder="Type name...")
     with col3:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("Refresh", use_container_width=True):
+        st.write("")
+        if st.button("Refresh", width="content"):
             st.rerun()
     
     # Get filtered data
@@ -28,35 +38,32 @@ def render_patient_requests():
         requests = [r for r in requests if search.lower() in r['patient_name'].lower()]
     
     if not requests:
-        st.markdown("""
-        <div class="empty-state">
-            <h3>No requests found</h3>
-            <p>Try adjusting your filters or load demo data.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.info("No requests found. Try adjusting your filters or load demo data.")
         return
     
-    st.markdown(f"**{len(requests)} request(s) found**")
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.write(f"**{len(requests)} request(s) found**")
     
     # Display requests
     for req in requests:
-        with st.expander(f"{req['patient_name']} — {req['category']} ({req['status'].replace('_', ' ').title()})"):
+        status_label = STATUS_LABELS.get(req['status'], req['status'].replace('_', ' ').title())
+        with st.expander(f"{req['patient_name']} — {req['category']} ({status_label})"):
             col1, col2 = st.columns([3, 1])
             
             with col1:
-                st.markdown(f"**Description:** {req['description']}")
-                st.markdown(f"**Urgency:** {req['urgency']}")
-                st.markdown(f"**Language:** {req['language']}")
+                st.write(f"**Description:** {req['description']}")
+                st.write(f"**Urgency:** {req['urgency']}")
+                st.write(f"**Language:** {req.get('language', 'en')}")
                 if req.get('accessibility_needs'):
-                    st.markdown(f"**Accessibility Needs:** {req['accessibility_needs']}")
-                st.markdown(f"**Submitted:** {req['created_at']}")
+                    st.write(f"**Accessibility Needs:** {req['accessibility_needs']}")
+                if req.get('preferred_appointment_date'):
+                    st.write(f"**Preferred Date:** {req['preferred_appointment_date']}")
+                st.caption(f"Submitted: {req['created_at']}")
                 
                 if req.get('processing_time_minutes'):
-                    st.markdown(f"**Processing Time:** {req['processing_time_minutes']} minutes")
+                    st.write(f"**Processing Time:** {req['processing_time_minutes']} minutes")
             
             with col2:
-                st.markdown("**Status History**")
+                st.write("**Status History**")
                 history = get_request_history(req['id'])
                 for h in history[-3:]:
-                    st.markdown(f"- {h['new_status'].replace('_', ' ').title()} ({h['created_at'][:16]})")
+                    st.caption(f"- {STATUS_LABELS.get(h['new_status'], h['new_status'].replace('_', ' ').title())} ({h['created_at'][:16]})")

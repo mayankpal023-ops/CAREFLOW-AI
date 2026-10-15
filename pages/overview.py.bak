@@ -1,0 +1,115 @@
+"""Overview Dashboard Page"""
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+from utils.database import get_dashboard_metrics
+from utils.chart_config import get_light_layout, get_pie_colors, COLORS
+
+def render_overview():
+    """Render the main overview dashboard."""
+    st.header("Operational Overview")
+    
+    metrics = get_dashboard_metrics()
+    
+    if metrics['total_requests'] == 0:
+        st.info("Welcome to CareFlow AI. No patient requests yet. Load demo data or submit requests from the Patient Portal.", title="Getting Started")
+        return
+    
+    # Metric cards using native st.metric
+    col1, col2, col3, col4, col5 = st.columns(5)
+    
+    with col1:
+        st.metric("Total Requests", metrics['total_requests'])
+    
+    with col2:
+        st.metric("Pending", metrics['pending_requests'])
+    
+    with col3:
+        st.metric("Processing", metrics['processing_requests'])
+    
+    with col4:
+        st.metric("Completed", metrics['completed_requests'])
+    
+    with col5:
+        avg_time = metrics['avg_processing_time']
+        time_display = f"{avg_time} min" if avg_time else "N/A"
+        st.metric("Avg. Processing Time", time_display)
+    
+    st.write("")
+    
+    # Charts section
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Status distribution pie chart
+        status_data = metrics['by_status']
+        if status_data:
+            df_status = pd.DataFrame([
+                {'Status': k.replace('_', ' ').title(), 'Count': v} 
+                for k, v in status_data.items()
+            ])
+            fig = px.pie(df_status, values='Count', names='Status')
+            fig.update_traces(
+                marker=dict(colors=get_pie_colors(df_status['Status'].tolist())),
+                textfont=dict(size=12, color='#172B4D')
+            )
+            fig.update_layout(
+                **get_light_layout(title='Requests by Status', height=300),
+                legend=dict(orientation='h', yanchor='bottom', y=-0.2, x=0.5, xanchor='center')
+            )
+            st.plotly_chart(fig, width="stretch", alt="Pie chart showing requests by status")
+    
+    with col2:
+        # Category bar chart
+        category_data = metrics['by_category']
+        if category_data:
+            df_cat = pd.DataFrame([
+                {'Category': k, 'Count': v} 
+                for k, v in category_data.items()
+            ])
+            fig = px.bar(df_cat, x='Count', y='Category',
+                        color_discrete_sequence=[COLORS['primary']], orientation='h')
+            fig.update_layout(
+                **get_light_layout(title='Requests by Category', height=300, showlegend=False),
+                xaxis_title='Count',
+                yaxis_title=''
+            )
+            fig.update_yaxes(tickfont=dict(size=10, color='#526581'))
+            st.plotly_chart(fig, width="stretch", alt="Bar chart showing requests by category")
+    
+    st.write("")
+    
+    # Recent requests and bottlenecks
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.subheader("Recent Activity")
+        recent = metrics['recent_requests']
+        if recent:
+            for req in recent[:5]:
+                status_colors = {
+                    'submitted': '#D97706', 'pending': '#3B82F6', 
+                    'processing': '#7C3AED', 'completed': '#059669'
+                }
+                color = status_colors.get(req['status'], '#6B7280')
+                with st.container(border=True):
+                    st.write(f"**:{color}[{req['patient_name']}]** — {req['category']}")
+                    st.caption(f"Status: {req['status'].replace('_', ' ').title()} | Submitted: {req['created_at'][:10]}")
+        else:
+            st.info("No recent activity")
+    
+    with col2:
+        st.subheader("Bottleneck Alerts")
+        
+        # Show bottleneck alerts
+        urgent_count = 0
+        for req in metrics['recent_requests']:
+            if req['urgency'] == 'Urgent' and req['status'] not in ['completed', 'cancelled']:
+                urgent_count += 1
+                st.warning(f"**Urgent:** {req['patient_name']} — {req['category']}")
+        
+        if metrics['processing_requests'] > 3:
+            st.warning(f"**High Load:** {metrics['processing_requests']} requests currently processing")
+        
+        if urgent_count == 0 and metrics['processing_requests'] <= 3:
+            st.success("No critical bottlenecks detected")
