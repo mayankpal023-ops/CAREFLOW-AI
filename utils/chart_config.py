@@ -32,6 +32,9 @@ def get_light_layout(title=None, height=350, showlegend=True):
     
     Returns a plain dict that can be unpacked with ** in update_layout().
     This fixes the TypeError: argument after ** must be a mapping, not Layout.
+    
+    Note: 'legend' is NOT included in this base layout — it is passed separately
+    when needed via the fig.update_layout(legend=...) keyword argument.
     """
     return {
         'title': {
@@ -48,12 +51,7 @@ def get_light_layout(title=None, height=350, showlegend=True):
         },
         'margin': {'l': 50, 'r': 30, 't': 60, 'b': 50},
         'showlegend': showlegend,
-        'legend': {
-            'font': {'size': 11, 'color': '#172B4D'},
-            'bgcolor': 'rgba(255,255,255,0.8)',
-            'bordercolor': '#E2E8F0',
-            'borderwidth': 1,
-        },
+        # 'legend' key intentionally omitted — passed separately when needed
         'xaxis': {
             'gridcolor': '#F1F5F9',
             'linecolor': '#E2E8F0',

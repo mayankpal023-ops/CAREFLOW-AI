@@ -117,7 +117,7 @@ def render_overview():
                 textposition='inside'
             )
             fig.update_layout(
-                **get_light_layout(title=None, height=300),
+                **get_light_layout(title=None, height=300, showlegend=True),
                 legend=dict(orientation='h', yanchor='bottom', y=-0.2, x=0.5, xanchor='center')
             )
             st.plotly_chart(fig, width="stretch", alt="Pie chart showing requests by status")

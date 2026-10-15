@@ -59,9 +59,64 @@ def render_sidebar():
         metrics = cached_metrics()
         st.subheader("Quick Stats")
         st.metric("Total Requests", metrics['total_requests'])
-        
+    
     return page
 
+# Add JavaScript to hide Streamlit's default top navigation menu
+# This targets the top navigation bar generated from the pages/ directory
+st.markdown("""
+<script>
+// Wait for DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Try multiple selectors to find the top navigation bar
+    const navSelectors = [
+        '[data-testid="stNav"]',
+        '.css-1l37s4g',
+        '.css-1d391kg',
+    ];
+    
+    // Find and remove the top navigation bar
+    let navElement = null;
+    for (const selector of navSelectors) {
+        const elements = document.querySelectorAll(selector);
+        if (elements.length > 0) {
+            // Find the one that looks like a top navigation bar
+            for (const el of elements) {
+                if (el.offsetHeight > 0 && el.offsetWidth > 0) {
+                    navElement = el;
+                    break;
+                }
+            }
+            if (navElement) break;
+        }
+    }
+    
+    // Also check for the specific stNav element
+    const explicitNav = document.querySelector('[data-testid="stNav"]');
+    if (explicitNav) {
+        navElement = explicitNav;
+    }
+    
+    // Hide and remove the top navigation bar
+    if (navElement) {
+        // First hide it
+        navElement.style.display = 'none';
+        // Then try to remove it from the DOM
+        try {
+            navElement.parentNode.removeChild(navElement);
+        } catch(e) {
+            // If removal fails, just keep it hidden
+        }
+    }
+    
+    // Check for and hide the hamburger menu/mobile nav
+    const mobileNav = document.querySelector('[data-testid="stSidebarNav"]');
+    if (mobileNav) {
+        mobileNav.style.display = 'none';
+    }
+});
+</script>
+""", unsafe_allow_html=True)
 # Import page functions from pages/ module
 from pages.overview import render_overview
 from pages.patient_portal import render_patient_portal

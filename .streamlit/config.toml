@@ -32,3 +32,7 @@ dataframeHeaderTextColor = "#FFFFFF"
 [theme]
 paddingTop = "1rem"
 paddingBottom = "2rem"
+
+[client]
+theme = "light"
+theme.base = "light"
